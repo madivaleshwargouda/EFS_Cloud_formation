@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+
+  RegionName:
+    Type: String
+    Default: us-east-1
+
+Resources:
+  MyVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      CidrBlock: 10.0.0.0/16
+      Tags:
+       - Key: Name
+         Value: MyVPCa
+   
+  Publicsubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.0.0/24
+      AvailabilityZone: us-east-1a
+      MapPublicIpOnLaunch: true
+      Tags:
+       - Key: Name
+         Value: Publicsubnet1
+
+  Publicsubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: us-east-1b
+      MapPublicIpOnLaunch: true
+      Tags:
+       - Key: Name
+         Value: Publicsubnet2
+
+  Publicsubnet3:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.6.0/24
+      AvailabilityZone: us-east-1c
+      MapPublicIpOnLaunch: true
+      Tags:
+       - Key: Name
+         Value: Publicsubnet3
+
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties: 
+      Tags:
+      - Key: Name
+        Value: vpcinternetgateway
+
+  VPCGatewayattachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref MyVPC
+
+  PublicRT:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref MyVPC
+      Tags:
+       - Key: Name
+         Value: PublicRouteTable
+
+  Publicsubnetassociation1:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties: 
+     RouteTableId: !Ref PublicRT
+     SubnetId: !Ref Publicsubnet1    
+  
+  Publicsubnetassociation2:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties: 
+     RouteTableId: !Ref PublicRT
+     SubnetId: !Ref Publicsubnet2
+  
+  Publicsubnetassociation3:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties: 
+     RouteTableId: !Ref PublicRT
+     SubnetId: !Ref Publicsubnet3
+
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PublicRT
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  EC2SecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: EC2 instance CF
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+
+  EFSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref MyVPC
+      GroupDescription: EFS Security Group
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+      Tags:
+        - Key: Name
+          Value: EFS
+
+  EFSFileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      BackupPolicy:
+        Status: ENABLED
+      PerformanceMode: maxIO
+      Encrypted: true
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_30_DAYS      
+      FileSystemTags:
+      - Key: Name
+        Value: EFS
+
+  EFSMountTargetAZ1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: EFSFileSystem
+      SubnetId: !Ref Publicsubnet1
+      SecurityGroups:
+      - Ref: EFSSecurityGroup
+
+  EFSMountTargetAZ2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: EFSFileSystem
+      SubnetId: !Ref Publicsubnet2
+      SecurityGroups:
+      - Ref: EFSSecurityGroup
+
+  EFSMountTargetAZ3:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: EFSFileSystem
+      SubnetId: !Ref Publicsubnet3
+      SecurityGroups:
+      - Ref: EFSSecurityGroup
